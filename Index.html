@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elite Betting System</title>
+    <style>
+        :root {
+            --gold: #f1c40f;
+            --odd-red: #e74c3c;
+            --even-blue: #3498db;
+            --dark-bg: #121212;
+            --panel-bg: #1e1e1e;
+        }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: var(--dark-bg);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .user-stats {
+            background: var(--panel-bg);
+            padding: 15px 30px;
+            border-radius: 50px;
+            border: 2px solid var(--gold);
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        .game-card {
+            background: var(--panel-bg);
+            padding: 30px;
+            border-radius: 20px;
+            width: 380px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.7);
+        }
+
+        /* Dice Section */
+        .dice-container {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 25px 0;
+        }
+
+        .dice {
+            width: 65px;
+            height: 65px;
+            background: white;
+            color: black;
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2.2rem;
+            font-weight: bold;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* Admin Cheat Box */
+        #adminHint {
+            display: none;
+            background: rgba(241, 196, 15, 0.15);
+            border: 1px dashed var(--gold);
+            padding: 10px;
+            margin-bottom: 15px;
+            color: var(--gold);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: 1px solid #333;
+            background: #252525;
+            color: white;
+            text-align: center;
+            box-sizing: border-box;
+        }
+
+        .control-btns {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+            text-transform: uppercase;
+        }
+
+        .btn-odd { background-color: var(--odd-red); color: white; }
+        .btn-even { background-color: var(--even-blue); color: white; }
+        .btn:hover { opacity: 0.9; transform: scale(1.02); }
+
+        /* History (Soi Cau) */
+        .history-panel {
+            margin-top: 30px;
+            width: 380px;
+        }
+
+        .history-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 10px;
+            min-height: 40px;
+        }
+
+        .history-ball {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .ball-odd { background: var(--odd-red); }
+        .ball-even { background: var(--even-blue); }
+
+        #gameMessage {
+            margin-top: 15px;
+            min-height: 24px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="user-stats">
+        BALANCE: <span id="userBalanceDisplay">1,000,000</span> VND
+    </div>
+
+    <div class="game-card">
+        <h2 style="color: var(--gold); margin: 0 0 10px 0;">DICE GAME</h2>
+        
+        <div id="adminHint">PREDICTION: <span id="nextResultLabel">---</span></div>
+
+        <div class="dice-container">
+            <div class="dice" id="dice1">?</div>
+            <div class="dice" id="dice2">?</div>
+            <div class="dice" id="dice3">?</div>
+        </div>
+
+        <div style="font-size: 1.1rem; margin-bottom: 15px;">
+            TOTAL: <span id="totalScore" style="color: var(--gold);">0</span>
+        </div>
+
+        <input type="number" id="betAmountInput" placeholder="Enter Bet Amount">
+        <input type="text" id="promoInput" placeholder="Promo / Admin Code" oninput="handleAdminCodeCheck()">
+
+        <div class="control-btns">
+            <button class="btn btn-odd" onclick="handlePlayAction('ODD')">Lẻ (Odd)</button>
+            <button class="btn btn-even" onclick="handlePlayAction('EVEN')">Chẵn (Even)</button>
+        </div>
+
+        <div id="gameMessage"></div>
+    </div>
+
+    <div class="history-panel">
+        <p style="margin-bottom: 10px; font-weight: bold;">HISTORY (SOI CẦU)</p>
+        <div class="history-grid" id="historyLog"></div>
+    </div>
+
+    <script>
+        // State Management
+        let currentBalance = 1000000;
+        let adminPredefinedResult = "";
+        const matchHistory = [];
+
+        /**
+         * Check for Admin Code (kemanh2013)
+         */
+        function handleAdminCodeCheck() {
+            const input = document.getElementById('promoInput').value.trim();
+            const hintBox = document.getElementById('adminHint');
+            const label = document.getElementById('nextResultLabel');
+
+            if (input === "kemanh2013") {
+                hintBox.style.display = "block";
+                if (!adminPredefinedResult) {
+                    adminPredefinedResult = Math.random() > 0.5 ? "ODD" : "EVEN";
+                }
+                label.innerText = adminPredefinedResult;
+            } else {
+                hintBox.style.display = "none";
+            }
+        }
+
+        /**
+         * Core Game Logic
+         */
+        function handlePlayAction(playerSelection) {
+            const betValue = parseInt(document.getElementById('betAmountInput').value);
+            const msg = document.getElementById('gameMessage');
+
+            // Validation
+            if (isNaN(betValue) || betValue <= 0 || betValue > currentBalance) {
+                msg.innerText = "Invalid amount or insufficient funds!";
+                msg.style.color = "orange";
+                return;
+            }
+
+            msg.innerText = "Rolling...";
+            msg.style.color = "white";
+
+            // Visual Effect
+            const diceElements = [document.getElementById('dice1'), document.getElementById('dice2'), document.getElementById('dice3')];
+            diceElements.forEach(d => d.style.transform = "rotate(360deg)");
+
+            setTimeout(() => {
+                let d1, d2, d3, total, finalOutcome;
+
+                // Admin Override Logic
+                if (adminPredefinedResult !== "") {
+                    finalOutcome = adminPredefinedResult;
+                    do {
+                        d1 = Math.floor(Math.random() * 6) + 1;
+                        d2 = Math.floor(Math.random() * 6) + 1;
+                        d3 = Math.floor(Math.random() * 6) + 1;
+                        total = d1 + d2 + d3;
+                        var tempResult = (total % 2 !== 0) ? "ODD" : "EVEN";
+                    } while (tempResult !== finalOutcome);
+                } else {
+                    d1 = Math.floor(Math.random() * 6) + 1;
+                    d2 = Math.floor(Math.random() * 6) + 1;
+                    d3 = Math.floor(Math.random() * 6) + 1;
+                    total = d1 + d2 + d3;
+                    finalOutcome = (total % 2 !== 0) ? "ODD" : "EVEN";
+                }
+
+                // Update UI
+                diceElements.forEach((d, index) => {
+                    d.style.transform = "rotate(0deg)";
+                    d.innerText = [d1, d2, d3][index];
+                });
+                document.getElementById('totalScore').innerText = total;
+
+                // Win/Loss Calculation
+                if (playerSelection === finalOutcome) {
+                    currentBalance += betValue;
+                    msg.innerText = `WIN! +${betValue.toLocaleString()} VND`;
+                    msg.style.color = "#2ecc71";
+                } else {
+                    currentBalance -= betValue;
+                    msg.innerText = `LOSS! -${betValue.toLocaleString()} VND`;
+                    msg.style.color = "#e74c3c";
+                }
+
+                // Refresh Displays
+                document.getElementById('userBalanceDisplay').innerText = currentBalance.toLocaleString();
+                updateHistoryUI(finalOutcome);
+
+                // Prepare next round for admin
+                adminPredefinedResult = Math.random() > 0.5 ? "ODD" : "EVEN";
+                handleAdminCodeCheck();
+
+            }, 600);
+        }
+
+        /**
+         * History Tracking Logic
+         */
+        function updateHistoryUI(result) {
+            matchHistory.push(result);
+            if (matchHistory.length > 24) matchHistory.shift();
+
+            const log = document.getElementById('historyLog');
+            log.innerHTML = "";
+
+            matchHistory.forEach(item => {
+                const dot = document.createElement('div');
+                dot.className = `history-ball ${item === 'ODD' ? 'ball-odd' : 'ball-even'}`;
+                dot.innerText = item === 'ODD' ? 'O' : 'E';
+                log.appendChild(dot);
+            });
+        }
+    </script>
+</body>
+</html>
